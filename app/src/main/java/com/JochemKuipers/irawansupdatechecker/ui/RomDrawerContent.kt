@@ -2,7 +2,6 @@ package com.JochemKuipers.irawansupdatechecker.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +20,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -40,7 +41,7 @@ fun RomDrawerContent(
     modifier: Modifier = Modifier
 ) {
     var expandedDevices by remember { mutableStateOf(emptySet<String>()) }
-    var expandedRoms by remember { mutableStateOf(emptySet<String>()) }
+    val expandedRoms = remember { mutableStateListOf<String>() }
 
     Column(
         modifier = modifier
@@ -67,8 +68,8 @@ fun RomDrawerContent(
                     else expandedDevices + device.codename
                 },
                 onToggleRom = { key ->
-                    expandedRoms = if (key in expandedRoms) expandedRoms - key
-                    else expandedRoms + key
+                    if (key in expandedRoms) expandedRoms.remove(key)
+                    else expandedRoms.add(key)
                 }
             )
         }
@@ -79,7 +80,7 @@ fun RomDrawerContent(
 private fun DeviceRow(
     device: DeviceItem,
     isExpanded: Boolean,
-    expandedRoms: Set<String>,
+    expandedRoms: List<String>,
     selectedPost: RomPost?,
     onPostSelected: (RomPost) -> Unit,
     onToggleDevice: () -> Unit,
@@ -107,14 +108,16 @@ private fun DeviceRow(
         }
         if (isExpanded) {
             device.roms.forEach { rom ->
-                RomRow(
-                    deviceCodename = device.codename,
-                    rom = rom,
-                    isExpanded = "$device.codename|${rom.name}" in expandedRoms,
-                    selectedPost = selectedPost,
-                    onPostSelected = onPostSelected,
-                    onToggle = { onToggleRom("${device.codename}|${rom.name}") }
-                )
+                val romKey = "${device.codename}|${rom.name}"
+                key(romKey) {
+                    RomRow(
+                        rom = rom,
+                        isExpanded = romKey in expandedRoms,
+                        selectedPost = selectedPost,
+                        onPostSelected = onPostSelected,
+                        onToggle = { onToggleRom(romKey) }
+                    )
+                }
             }
         }
     }
@@ -122,7 +125,6 @@ private fun DeviceRow(
 
 @Composable
 private fun RomRow(
-    deviceCodename: String,
     rom: RomEntry,
     isExpanded: Boolean,
     selectedPost: RomPost?,
@@ -132,29 +134,26 @@ private fun RomRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(onClick = onToggle)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onToggle
-                )
                 .padding(start = 32.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = rom.name,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         if (isExpanded) {
@@ -167,7 +166,7 @@ private fun RomRow(
                                 Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
                             else Modifier
                         )
-                        .clickable { onPostSelected(post) }
+                        .clickable(onClick = { onPostSelected(post) })
                         .padding(start = 48.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,

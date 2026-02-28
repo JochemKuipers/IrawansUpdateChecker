@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,7 +39,10 @@ import com.JochemKuipers.irawansupdatechecker.data.RomPost
 fun RomDrawerContent(
     devices: List<DeviceItem>,
     selectedPost: RomPost?,
+    followedRomKeys: Set<String>,
     onPostSelected: (RomPost) -> Unit,
+    onFollow: (romKey: String, version: String, displayName: String) -> Unit,
+    onUnfollow: (romKey: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expandedDevices by remember { mutableStateOf(emptySet<String>()) }
@@ -62,7 +67,10 @@ fun RomDrawerContent(
                 isExpanded = device.codename in expandedDevices,
                 expandedRoms = expandedRoms,
                 selectedPost = selectedPost,
+                followedRomKeys = followedRomKeys,
                 onPostSelected = onPostSelected,
+                onFollow = onFollow,
+                onUnfollow = onUnfollow,
                 onToggleDevice = {
                     expandedDevices = if (device.codename in expandedDevices) expandedDevices - device.codename
                     else expandedDevices + device.codename
@@ -82,7 +90,10 @@ private fun DeviceRow(
     isExpanded: Boolean,
     expandedRoms: List<String>,
     selectedPost: RomPost?,
+    followedRomKeys: Set<String>,
     onPostSelected: (RomPost) -> Unit,
+    onFollow: (romKey: String, version: String, displayName: String) -> Unit,
+    onUnfollow: (romKey: String) -> Unit,
     onToggleDevice: () -> Unit,
     onToggleRom: (String) -> Unit
 ) {
@@ -112,10 +123,19 @@ private fun DeviceRow(
                 key(romKey) {
                     RomRow(
                         rom = rom,
+                        deviceName = device.deviceName,
                         isExpanded = romKey in expandedRoms,
+                        isFollowed = romKey in followedRomKeys,
                         selectedPost = selectedPost,
                         onPostSelected = onPostSelected,
-                        onToggle = { onToggleRom(romKey) }
+                        onToggle = { onToggleRom(romKey) },
+                        onFollowClick = {
+                            val latest = rom.updates.firstOrNull()
+                            if (latest != null) {
+                                if (romKey in followedRomKeys) onUnfollow(romKey)
+                                else onFollow(romKey, latest.version, "${rom.name} for ${device.deviceName}")
+                            }
+                        }
                     )
                 }
             }
@@ -126,10 +146,13 @@ private fun DeviceRow(
 @Composable
 private fun RomRow(
     rom: RomEntry,
+    deviceName: String,
     isExpanded: Boolean,
+    isFollowed: Boolean,
     selectedPost: RomPost?,
     onPostSelected: (RomPost) -> Unit,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onFollowClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -140,7 +163,7 @@ private fun RomRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 32.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 32.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -153,8 +176,20 @@ private fun RomRow(
             Text(
                 text = rom.name,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
+            androidx.compose.material3.IconButton(
+                onClick = onFollowClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFollowed) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = if (isFollowed) "Unfollow" else "Follow for updates",
+                    tint = if (isFollowed) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         if (isExpanded) {
             rom.updates.forEach { post ->

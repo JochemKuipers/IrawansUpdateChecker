@@ -10,12 +10,9 @@ import com.JochemKuipers.irawansupdatechecker.data.RomRepository
 import com.JochemKuipers.irawansupdatechecker.data.SettingsRepository
 import com.JochemKuipers.irawansupdatechecker.worker.WorkScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class RomUiState(
@@ -31,27 +28,18 @@ class RomViewModel(application: Application) : AndroidViewModel(application) {
     private val followRepo = FollowRepository(application.applicationContext)
     private val settingsRepo = SettingsRepository(application.applicationContext)
 
-    // Optimistic updates: apply immediately so the star icon toggles without waiting for DataStore
-    private val _pendingFollowed = MutableStateFlow<Set<String>>(emptySet())
-    private val _pendingUnfollowed = MutableStateFlow<Set<String>>(emptySet())
-
-    val followedRomKeys: StateFlow<Set<String>> = combine(
-        followRepo.followedRomKeys,
-        _pendingFollowed,
-        _pendingUnfollowed
-    ) { fromRepo, pendingAdd, pendingRemove ->
-        (fromRepo + pendingAdd) - pendingRemove
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptySet()
-    )
+    // Single source for UI: update immediately on follow/unfollow, and sync from repo
+    private val _followedRomKeys = MutableStateFlow<Set<String>>(emptySet())
+    val followedRomKeys: StateFlow<Set<String>> = _followedRomKeys.asStateFlow()
 
     private val _state = MutableStateFlow(RomUiState())
     val state: StateFlow<RomUiState> = _state.asStateFlow()
 
     init {
         load()
+        viewModelScope.launch {
+            followRepo.followedRomKeys.collect { _followedRomKeys.value = it }
+        }
         viewModelScope.launch {
             val s = settingsRepo.settings.first()
             if (s.notificationsEnabled) {
@@ -85,26 +73,16 @@ class RomViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun follow(romKey: String, currentVersion: String, displayName: String) {
-        _pendingUnfollowed.value = _pendingUnfollowed.value - romKey
-        _pendingFollowed.value = _pendingFollowed.value + romKey
+        _followedRomKeys.value = _followedRomKeys.value + romKey
         viewModelScope.launch {
-            try {
-                followRepo.follow(romKey, currentVersion, displayName)
-            } finally {
-                _pendingFollowed.value = _pendingFollowed.value - romKey
-            }
+            followRepo.follow(romKey, currentVersion, displayName)
         }
     }
 
     fun unfollow(romKey: String) {
-        _pendingFollowed.value = _pendingFollowed.value - romKey
-        _pendingUnfollowed.value = _pendingUnfollowed.value + romKey
+        _followedRomKeys.value = _followedRomKeys.value - romKey
         viewModelScope.launch {
-            try {
-                followRepo.unfollow(romKey)
-            } finally {
-                _pendingUnfollowed.value = _pendingUnfollowed.value - romKey
-            }
+            followRepo.unfollow(romKey)
         }
     }
 

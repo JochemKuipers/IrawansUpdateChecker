@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.JochemKuipers.irawansupdatechecker.data.SettingsRepository
 import kotlinx.coroutines.flow.first
+import com.JochemKuipers.irawansupdatechecker.worker.NotificationHelper
 import com.JochemKuipers.irawansupdatechecker.worker.WorkScheduler
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -40,5 +41,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 WorkScheduler.cancel(getApplication())
             }
         }
+    }
+
+    /** Show a sample notification so you can verify notifications work. */
+    fun sendTestNotification() {
+        NotificationHelper.showUpdateNotification(
+            context = getApplication(),
+            romDisplayName = "Test ROM (sample)",
+            newVersion = "1.0",
+            notificationId = -1
+        )
     }
 }

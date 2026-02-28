@@ -114,9 +114,25 @@ fun SettingsScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Test notifications",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
             Text(
                 text = "Follow ROMs from the sidebar to get notified when new versions are released.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            androidx.compose.material3.Button(
+                onClick = { viewModel.sendTestNotification() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Send test notification")
+            }
+            Text(
+                text = "Sends a sample notification so you can verify notifications work. Use the refresh icon in the main screen top bar to check for updates.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

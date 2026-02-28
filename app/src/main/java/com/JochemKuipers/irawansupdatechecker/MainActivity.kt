@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +86,12 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     actions = {
+                                        IconButton(onClick = { viewModel.runCheckNow() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = "Check for updates now"
+                                            )
+                                        }
                                         IconButton(onClick = { navController.navigate("settings") }) {
                                             Icon(
                                                 imageVector = Icons.Default.Settings,

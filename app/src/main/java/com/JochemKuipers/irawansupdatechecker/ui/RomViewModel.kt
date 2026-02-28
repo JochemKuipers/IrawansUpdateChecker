@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -30,7 +31,17 @@ class RomViewModel(application: Application) : AndroidViewModel(application) {
     private val followRepo = FollowRepository(application.applicationContext)
     private val settingsRepo = SettingsRepository(application.applicationContext)
 
-    val followedRomKeys = followRepo.followedRomKeys.stateIn(
+    // Optimistic updates: apply immediately so the star icon toggles without waiting for DataStore
+    private val _pendingFollowed = MutableStateFlow<Set<String>>(emptySet())
+    private val _pendingUnfollowed = MutableStateFlow<Set<String>>(emptySet())
+
+    val followedRomKeys: StateFlow<Set<String>> = combine(
+        followRepo.followedRomKeys,
+        _pendingFollowed,
+        _pendingUnfollowed
+    ) { fromRepo, pendingAdd, pendingRemove ->
+        (fromRepo + pendingAdd) - pendingRemove
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptySet()
@@ -74,14 +85,31 @@ class RomViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun follow(romKey: String, currentVersion: String, displayName: String) {
+        _pendingUnfollowed.value = _pendingUnfollowed.value - romKey
+        _pendingFollowed.value = _pendingFollowed.value + romKey
         viewModelScope.launch {
-            followRepo.follow(romKey, currentVersion, displayName)
+            try {
+                followRepo.follow(romKey, currentVersion, displayName)
+            } finally {
+                _pendingFollowed.value = _pendingFollowed.value - romKey
+            }
         }
     }
 
     fun unfollow(romKey: String) {
+        _pendingFollowed.value = _pendingFollowed.value - romKey
+        _pendingUnfollowed.value = _pendingUnfollowed.value + romKey
         viewModelScope.launch {
-            followRepo.unfollow(romKey)
+            try {
+                followRepo.unfollow(romKey)
+            } finally {
+                _pendingUnfollowed.value = _pendingUnfollowed.value - romKey
+            }
         }
+    }
+
+    /** Run the update checker once now (for followed ROMs). */
+    fun runCheckNow() {
+        WorkScheduler.runCheckNow(getApplication())
     }
 }
